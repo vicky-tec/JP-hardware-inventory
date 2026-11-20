@@ -27,8 +27,36 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Restore consistent debug signing keystore
-        run: base64 -d debug.keystore.base64 > debug.keystore
+      - name: Cache Android debug keystore
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: android-debug-keystore-v1
+
+      - name: Ensure debug signing keystore and print SHA-1 / SHA-256
+        run: |
+          mkdir -p ~/.android
+          if [ ! -f ~/.android/debug.keystore ]; then
+            echo "Generating new debug.keystore for consistent CI signing..."
+            keytool -genkeypair -v \
+              -keystore ~/.android/debug.keystore \
+              -storepass android \
+              -alias androiddebugkey \
+              -keypass android \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+          else
+            echo "Using cached ~/.android/debug.keystore"
+          fi
+          cp ~/.android/debug.keystore ./debug.keystore
+          echo "=== Debug Keystore SHA-1 & SHA-256 Fingerprints ==="
+          keytool -list -v \
+            -keystore ~/.android/debug.keystore \
+            -alias androiddebugkey \
+            -storepass android \
+            -keypass android | grep -E "Alias|Owner:|SHA1:|SHA256:"
 
       - name: Grant execute permission to Gradle wrapper
         run: chmod +x gradlew
@@ -39,11 +67,8 @@ jobs:
       - name: Copy APK to JP-Hardware-debug.apk
         run: cp app/build/outputs/apk/debug/app-debug.apk JP-Hardware-debug.apk
 
-      - name: Print APK SHA-1 fingerprint
+      - name: Verify signed APK certificate
         run: |
-          echo "=== Keystore SHA-1 Fingerprint ==="
-          keytool -list -v -keystore debug.keystore -alias androiddebugkey -storepass android -keypass android | grep -E "Alias|Owner:|SHA1:|SHA256:"
-          echo "=== Signed APK Certificate Fingerprint ==="
           APKSIGNER=$(find "${ANDROID_HOME:-$ANDROID_SDK_ROOT}/build-tools" -name "apksigner" 2>/dev/null | sort -V | tail -n 1 || true)
           if [ -n "$APKSIGNER" ]; then
             "$APKSIGNER" verify --print-certs JP-Hardware-debug.apk | grep -E "Signer #1 certificate"
