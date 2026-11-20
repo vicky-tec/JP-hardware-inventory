@@ -1,0 +1,323 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isOwnTxId(id) {
+      return isValidId(id) && id.matches('^tx_' + request.auth.uid + '_[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidCategory(category) {
+      return category is string && category in [
+        'Pipes & Plumbing',
+        'Iron Rods & Steel',
+        'Nuts, Bolts & Screws',
+        'Taps & Sanitary',
+        'Building Materials',
+        'Tools',
+        'Tools & Accessories',
+        'Other Hardware'
+      ];
+    }
+
+    function isValidUnit(unit) {
+      return unit is string && unit in [
+        'Piece',
+        'Kg',
+        'Feet',
+        'Meter',
+        'Metre',
+        'Box',
+        'Packet',
+        'Bundle',
+        'Tonne'
+      ];
+    }
+
+    function isValidPaymentMode(mode) {
+      return mode is string && mode in ['Cash', 'UPI', 'Credit'];
+    }
+
+    function isValidAdjustmentReason(reason) {
+      return reason is string && reason in [
+        'Opening Stock',
+        'Damaged Goods',
+        'Physical Correction',
+        'Customer Return',
+        'Supplier Return'
+      ];
+    }
+
+    function isValidProduct(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+        data.itemCode is string && data.itemCode.size() >= 4 && data.itemCode.size() <= 9 &&
+        data.name is string && data.name.size() >= 1 && data.name.size() <= 120 &&
+        (!('brand' in data) || (data.brand is string && data.brand.size() <= 80)) &&
+        (!('sizeSpec' in data) || (data.sizeSpec is string && data.sizeSpec.size() <= 80)) &&
+        isValidCategory(data.category) &&
+        isValidUnit(data.unit) &&
+        data.purchasePrice is number && data.purchasePrice >= 0 &&
+        data.averageCost is number && data.averageCost >= 0 &&
+        data.sellingPrice is number && data.sellingPrice >= 0 &&
+        data.stockQty is number && data.stockQty >= 0 &&
+        data.lowStockLimit is number && data.lowStockLimit >= 0 &&
+        (!('description' in data) || (data.description is string && data.description.size() <= 1000)) &&
+        (!('imageDataUrl' in data) || (
+          data.imageDataUrl is string &&
+          data.imageDataUrl.size() <= 175000 &&
+          data.imageDataUrl.matches('^data:image/jpeg;base64,[A-Za-z0-9+/=]+$')
+        )) &&
+        (!('archived' in data) || data.archived is bool) &&
+        data.isDemo is bool &&
+        (!('demoBatchId' in data) || (data.demoBatchId is string && data.demoBatchId.size() <= 80)) &&
+        data.createdAt is timestamp && data.createdAt <= request.time &&
+        data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidPurchase(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+        isValidId(data.productId) &&
+        data.productName is string && data.productName.size() >= 1 && data.productName.size() <= 120 &&
+        data.itemCode is string && data.itemCode.size() >= 4 && data.itemCode.size() <= 9 &&
+        isValidUnit(data.unit) &&
+        data.quantity is number && data.quantity > 0 &&
+        data.unitPrice is number && data.unitPrice >= 0 &&
+        data.totalAmount is number && data.totalAmount >= 0 &&
+        (!('partyName' in data) || (data.partyName is string && data.partyName.size() <= 100)) &&
+        isValidPaymentMode(data.paymentMode) &&
+        (!('billGroupId' in data) || isValidId(data.billGroupId)) &&
+        data.transactionAt is timestamp && data.transactionAt <= request.time &&
+        data.isDemo is bool &&
+        (!('demoBatchId' in data) || (data.demoBatchId is string && data.demoBatchId.size() <= 80)) &&
+        data.createdAt is timestamp && data.createdAt <= request.time;
+    }
+
+    function isValidSale(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+        isValidId(data.productId) &&
+        data.productName is string && data.productName.size() >= 1 && data.productName.size() <= 120 &&
+        data.itemCode is string && data.itemCode.size() >= 4 && data.itemCode.size() <= 9 &&
+        isValidUnit(data.unit) &&
+        data.quantity is number && data.quantity > 0 &&
+        data.unitSellingPrice is number && data.unitSellingPrice >= 0 &&
+        data.unitCostAtSale is number && data.unitCostAtSale >= 0 &&
+        data.totalAmount is number && data.totalAmount >= 0 &&
+        data.estimatedProfit is number &&
+        (!('partyName' in data) || (data.partyName is string && data.partyName.size() <= 100)) &&
+        isValidPaymentMode(data.paymentMode) &&
+        (!('billGroupId' in data) || isValidId(data.billGroupId)) &&
+        data.transactionAt is timestamp && data.transactionAt <= request.time &&
+        data.isDemo is bool &&
+        (!('demoBatchId' in data) || (data.demoBatchId is string && data.demoBatchId.size() <= 80)) &&
+        data.createdAt is timestamp && data.createdAt <= request.time;
+    }
+
+    function isValidStockAdjustment(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+        isValidId(data.productId) &&
+        data.productName is string && data.productName.size() >= 1 && data.productName.size() <= 120 &&
+        data.itemCode is string && data.itemCode.size() >= 4 && data.itemCode.size() <= 9 &&
+        isValidUnit(data.unit) &&
+        data.previousQty is number && data.previousQty >= 0 &&
+        data.adjustmentDelta is number && data.adjustmentDelta != 0 &&
+        data.resultingQty is number && data.resultingQty >= 0 &&
+        data.resultingQty == data.previousQty + data.adjustmentDelta &&
+        isValidAdjustmentReason(data.reason) &&
+        (!('notes' in data) || (data.notes is string && data.notes.size() <= 300)) &&
+        data.transactionAt is timestamp && data.transactionAt <= request.time &&
+        data.isDemo is bool &&
+        data.createdAt is timestamp && data.createdAt <= request.time;
+    }
+
+    match /products/{productId} {
+      // Products do not require missing-document existence checks
+      allow get: if isSignedIn() && isValidId(productId) && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && existing().userId == request.auth.uid;
+
+      allow create: if isSignedIn() &&
+        isValidId(productId) &&
+        incoming().userId == request.auth.uid &&
+        incoming().keys().hasAll([
+          'userId', 'itemCode', 'name', 'category', 'unit',
+          'purchasePrice', 'averageCost', 'sellingPrice', 'stockQty',
+          'lowStockLimit', 'isDemo', 'createdAt', 'updatedAt'
+        ]) &&
+        incoming().keys().hasOnly([
+          'userId', 'itemCode', 'name', 'brand', 'sizeSpec', 'category', 'unit',
+          'purchasePrice', 'averageCost', 'sellingPrice', 'stockQty',
+          'lowStockLimit', 'description', 'imageDataUrl', 'archived',
+          'isDemo', 'demoBatchId', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidProduct(incoming());
+
+      allow update: if isSignedIn() &&
+        isValidId(productId) &&
+        existing().userId == request.auth.uid &&
+        incoming().userId == existing().userId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().isDemo == existing().isDemo &&
+        isValidProduct(incoming()) && (
+          // Action 1: Edit product metadata (cannot modify stockQty directly)
+          (
+            incoming().stockQty == existing().stockQty &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'itemCode', 'name', 'brand', 'sizeSpec', 'category', 'unit',
+              'purchasePrice', 'averageCost', 'sellingPrice',
+              'lowStockLimit', 'description', 'imageDataUrl', 'archived', 'updatedAt'
+            ])
+          ) ||
+          // Action 2: Archive / Restore product
+          (
+            incoming().stockQty == existing().stockQty &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['archived', 'updatedAt'])
+          ) ||
+          // Action 3: Stock-In Purchase transaction
+          (
+            incoming().stockQty > existing().stockQty &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'stockQty', 'purchasePrice', 'averageCost', 'updatedAt'
+            ])
+          ) ||
+          // Action 4: Stock-Out Sale transaction
+          (
+            incoming().stockQty < existing().stockQty &&
+            incoming().stockQty >= 0 &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'stockQty', 'updatedAt'
+            ])
+          ) ||
+          // Action 5: Audited Stock Adjustment transaction
+          (
+            incoming().stockQty != existing().stockQty &&
+            incoming().stockQty >= 0 &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'stockQty', 'updatedAt'
+            ])
+          )
+        );
+
+      // Only demo products may be deleted directly; real products are archived
+      allow delete: if isSignedIn() &&
+        isValidId(productId) &&
+        existing().userId == request.auth.uid &&
+        existing().isDemo == true;
+    }
+
+    match /purchases/{purchaseId} {
+      // Missing-document get is strictly restricted to user-prefixed transaction IDs for idempotency checks
+      allow get: if isSignedIn() && isValidId(purchaseId) && (
+        (resource == null && isOwnTxId(purchaseId)) ||
+        (resource != null && existing().userId == request.auth.uid)
+      );
+      allow list: if isSignedIn() && existing().userId == request.auth.uid;
+
+      allow create: if isSignedIn() &&
+        isValidId(purchaseId) &&
+        incoming().userId == request.auth.uid &&
+        incoming().keys().hasAll([
+          'userId', 'productId', 'productName', 'itemCode', 'unit',
+          'quantity', 'unitPrice', 'totalAmount', 'paymentMode',
+          'transactionAt', 'isDemo', 'createdAt'
+        ]) &&
+        incoming().keys().hasOnly([
+          'userId', 'productId', 'productName', 'itemCode', 'unit',
+          'quantity', 'unitPrice', 'totalAmount', 'partyName',
+          'paymentMode', 'billGroupId', 'transactionAt', 'isDemo', 'demoBatchId', 'createdAt'
+        ]) &&
+        isValidPurchase(incoming()) &&
+        exists(/databases/$(database)/documents/products/$(incoming().productId)) &&
+        get(/databases/$(database)/documents/products/$(incoming().productId)).data.userId == request.auth.uid;
+
+      allow update: if false;
+
+      allow delete: if isSignedIn() &&
+        isValidId(purchaseId) &&
+        existing().userId == request.auth.uid &&
+        existing().isDemo == true;
+    }
+
+    match /sales/{saleId} {
+      // Missing-document get is strictly restricted to user-prefixed transaction IDs for idempotency checks
+      allow get: if isSignedIn() && isValidId(saleId) && (
+        (resource == null && isOwnTxId(saleId)) ||
+        (resource != null && existing().userId == request.auth.uid)
+      );
+      allow list: if isSignedIn() && existing().userId == request.auth.uid;
+
+      allow create: if isSignedIn() &&
+        isValidId(saleId) &&
+        incoming().userId == request.auth.uid &&
+        incoming().keys().hasAll([
+          'userId', 'productId', 'productName', 'itemCode', 'unit',
+          'quantity', 'unitSellingPrice', 'unitCostAtSale', 'totalAmount',
+          'estimatedProfit', 'paymentMode', 'transactionAt', 'isDemo', 'createdAt'
+        ]) &&
+        incoming().keys().hasOnly([
+          'userId', 'productId', 'productName', 'itemCode', 'unit',
+          'quantity', 'unitSellingPrice', 'unitCostAtSale', 'totalAmount',
+          'estimatedProfit', 'partyName', 'paymentMode', 'billGroupId',
+          'transactionAt', 'isDemo', 'demoBatchId', 'createdAt'
+        ]) &&
+        isValidSale(incoming()) &&
+        exists(/databases/$(database)/documents/products/$(incoming().productId)) &&
+        get(/databases/$(database)/documents/products/$(incoming().productId)).data.userId == request.auth.uid;
+
+      allow update: if false;
+
+      allow delete: if isSignedIn() &&
+        isValidId(saleId) &&
+        existing().userId == request.auth.uid &&
+        existing().isDemo == true;
+    }
+
+    match /stock_adjustments/{adjustmentId} {
+      allow get: if isSignedIn() && isValidId(adjustmentId) && (
+        (resource == null && isOwnTxId(adjustmentId)) ||
+        (resource != null && existing().userId == request.auth.uid)
+      );
+      allow list: if isSignedIn() && existing().userId == request.auth.uid;
+
+      allow create: if isSignedIn() &&
+        isValidId(adjustmentId) &&
+        incoming().userId == request.auth.uid &&
+        incoming().keys().hasAll([
+          'userId', 'productId', 'productName', 'itemCode', 'unit',
+          'previousQty', 'adjustmentDelta', 'resultingQty', 'reason',
+          'transactionAt', 'isDemo', 'createdAt'
+        ]) &&
+        incoming().keys().hasOnly([
+          'userId', 'productId', 'productName', 'itemCode', 'unit',
+          'previousQty', 'adjustmentDelta', 'resultingQty', 'reason',
+          'notes', 'transactionAt', 'isDemo', 'createdAt'
+        ]) &&
+        isValidStockAdjustment(incoming()) &&
+        exists(/databases/$(database)/documents/products/$(incoming().productId)) &&
+        get(/databases/$(database)/documents/products/$(incoming().productId)).data.userId == request.auth.uid;
+
+      allow update: if false;
+
+      allow delete: if isSignedIn() &&
+        isValidId(adjustmentId) &&
+        existing().userId == request.auth.uid &&
+        existing().isDemo == true;
+    }
+  }
+}

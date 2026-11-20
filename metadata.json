@@ -1,0 +1,6 @@
+{
+  "name": "JP Hardware",
+  "description": "Indian hardware and building-materials retail inventory, sales, purchases, and low-stock management app.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

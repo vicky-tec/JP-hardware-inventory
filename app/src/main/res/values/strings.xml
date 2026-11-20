@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">JP Hardware</string>
+    <string name="tagline">Simple Stock &amp; Billing for Hardware Shops</string>
+    <string name="sign_in_google">Sign in with Google</string>
+    <string name="nav_home">Home</string>
+    <string name="nav_products">Products</string>
+    <string name="nav_buy_sell">Buy / Sell</string>
+    <string name="nav_alerts">Alerts</string>
+</resources>
