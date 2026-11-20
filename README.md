@@ -1,8 +1,14 @@
 <div align="center">
 
 <!-- ANIMATED HEADER BANNER -->
-<img width="100%" src="https://capsule-render.vercel.app/api?type=waving&color=0:1B4332,50:2D6A4F,100:D97706&height=220&section=header&text=JP%20HARDWARE&fontSize=64&fontAlign=50&fontAlignY=38&desc=Inventory%20%26%20Shop%20Management%20System%20%E2%80%A2%20Android%20%2B%20Firebase&descAlign=50&descAlignY=60&fontColor=ffffff&descColor=FEF3C7&animation=fadeIn" alt="JP Hardware Banner" />
-
+<p align="center">
+  <img
+    src="https://drive.google.com/uc?export=view&id=18Uwl4epeFvb2puJw7yTKxQr-VBs0jUsQ"
+    alt="JP Hardware Banner"
+    width="100%"
+    style="max-width:1200px; height:auto;"
+  />
+</p>
 <br/>
 
 <!-- Optional: Upload your JP Hardware logo to assets/logo.png and uncomment the line below -->
