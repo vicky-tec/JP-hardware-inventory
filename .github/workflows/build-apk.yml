@@ -1,0 +1,67 @@
+name: Build JP Hardware APK
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    name: Build & Publish Debug APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Restore consistent debug signing keystore
+        run: base64 -d debug.keystore.base64 > debug.keystore
+
+      - name: Grant execute permission to Gradle wrapper
+        run: chmod +x gradlew
+
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug
+
+      - name: Rename APK to JP-Hardware.apk
+        run: mv app/build/outputs/apk/debug/app-debug.apk JP-Hardware.apk
+
+      - name: Print APK SHA-1 fingerprint
+        run: |
+          echo "=== Keystore SHA-1 Fingerprint ==="
+          keytool -list -v -keystore debug.keystore -alias androiddebugkey -storepass android -keypass android | grep -E "Alias|Owner:|SHA1:|SHA256:"
+          echo "=== Signed APK Certificate Fingerprint ==="
+          APKSIGNER=$(find "${ANDROID_HOME:-$ANDROID_SDK_ROOT}/build-tools" -name "apksigner" 2>/dev/null | sort -V | tail -n 1 || true)
+          if [ -n "$APKSIGNER" ]; then
+            "$APKSIGNER" verify --print-certs JP-Hardware.apk | grep -E "Signer #1 certificate"
+          fi
+
+      - name: Upload JP-Hardware.apk as Workflow Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: JP-Hardware-APK
+          path: JP-Hardware.apk
+
+      - name: Publish JP-Hardware.apk to GitHub Release (latest-apk)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest-apk
+          name: JP Hardware - Latest APK
+          body: |
+            Automated build of **JP Hardware** Android APK.
+            Download `JP-Hardware.apk` below to install on Android.
+          files: JP-Hardware.apk
+          make_latest: true
