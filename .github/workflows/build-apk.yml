@@ -36,8 +36,8 @@ jobs:
       - name: Build Debug APK
         run: ./gradlew assembleDebug
 
-      - name: Rename APK to JP-Hardware.apk
-        run: mv app/build/outputs/apk/debug/app-debug.apk JP-Hardware.apk
+      - name: Copy APK to JP-Hardware-debug.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk JP-Hardware-debug.apk
 
       - name: Print APK SHA-1 fingerprint
         run: |
@@ -46,22 +46,48 @@ jobs:
           echo "=== Signed APK Certificate Fingerprint ==="
           APKSIGNER=$(find "${ANDROID_HOME:-$ANDROID_SDK_ROOT}/build-tools" -name "apksigner" 2>/dev/null | sort -V | tail -n 1 || true)
           if [ -n "$APKSIGNER" ]; then
-            "$APKSIGNER" verify --print-certs JP-Hardware.apk | grep -E "Signer #1 certificate"
+            "$APKSIGNER" verify --print-certs JP-Hardware-debug.apk | grep -E "Signer #1 certificate"
           fi
 
-      - name: Upload JP-Hardware.apk as Workflow Artifact
+      - name: Upload JP-Hardware-debug.apk as GitHub Actions Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: JP-Hardware-APK
-          path: JP-Hardware.apk
+          name: JP-Hardware-debug-apk
+          path: JP-Hardware-debug.apk
+          if-no-files-found: error
 
-      - name: Publish JP-Hardware.apk to GitHub Release (latest-apk)
+      - name: Publish JP-Hardware-debug.apk to GitHub Release (latest-apk)
+        id: publish_release
+        continue-on-error: true
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest-apk
-          name: JP Hardware - Latest APK
+          name: JP Hardware - Latest Debug APK
           body: |
-            Automated build of **JP Hardware** Android APK.
-            Download `JP-Hardware.apk` below to install on Android.
-          files: JP-Hardware.apk
+            Automated build of **JP Hardware** Android Debug APK.
+            Download `JP-Hardware-debug.apk` directly below to install on your Android device.
+          files: JP-Hardware-debug.apk
           make_latest: true
+
+      - name: Write workflow summary
+        if: always()
+        env:
+          RELEASE_OUTCOME: '${{ steps.publish_release.outcome }}'
+          RELEASE_URL: '${{ steps.publish_release.outputs.url }}'
+        run: |
+          {
+            echo "## JP Hardware APK Build Summary"
+            echo ""
+            echo "- **Build Command:** \`./gradlew assembleDebug\`"
+            echo "- **Output APK:** \`app/build/outputs/apk/debug/app-debug.apk\`"
+            echo "- **Packaged Asset:** \`JP-Hardware-debug.apk\`"
+            echo "- **Actions Artifact:** \`JP-Hardware-debug-apk\` (uploaded and available for download)"
+            if [ "$RELEASE_OUTCOME" = "success" ]; then
+              echo "- **GitHub Release Status:** Succeeded (tag \`latest-apk\`)"
+              if [ -n "$RELEASE_URL" ]; then
+                echo "- **Release URL:** $RELEASE_URL"
+              fi
+            else
+              echo "- **GitHub Release Status:** Failed (\`$RELEASE_OUTCOME\`) — workflow still succeeded and the Actions artifact \`JP-Hardware-debug-apk\` remains available for download."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
